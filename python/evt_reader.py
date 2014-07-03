@@ -45,27 +45,59 @@ def event_generator(evt_file):
 
 def mctree_maker(event):
     """Convert EVT-event to an I3MCTree"""
+    neutrino = get_neutrino(event)
+    secondaries = get_secondaries(event)
+    mctree = dataclasses.I3MCTree()
+    mctree.add_primary(neutrino)
+    for secondary in secondaries:
+        mctree.append_child(neutrino, secondary)
+    return mctree
+
+def get_neutrino(event):
+    """Extract and return a neutrino as I3Particle from given EVT-event"""
     if len(event['neutrino']) > 1:
-        raise NotImplemented("Sorry, only one primary is support atm!")
+        raise NotImplemented("Sorry, only one primary is supported atm!")
     raw_neutrino = event['neutrino'][0]
     neutrino_id, rest = unpack_nfirst(raw_neutrino, 1)
     pos_x, pos_y, pos_z, rest = unpack_nfirst(rest, 3)
     dir_x, dir_y, dir_z, rest = unpack_nfirst(rest, 3)
     energy, time, _, _, _, pdg, _ = rest
-    neutrino = dataclasses.I3Particle()
-    neutrino.time = time
-    neutrino.energy = energy
-    neutrino.pdg_encoding = int(pdg)
-    position = dataclasses.I3Position(pos_x, pos_y, pos_z)
-    direction = dataclasses.I3Direction(dir_x, dir_y, dir_z)
-    neutrino.dir = direction
-    neutrino.pos = position
+    neutrino = make_particle(pos_x, pos_y, pos_z, dir_x, dir_y, dir_z,
+                             energy, time, pdg)
+    return neutrino
+
+def get_secondaries(event):
+    """Extract and return a secondaries as I3Particles from given EVT-event"""
+    secondaries = []
+    for raw_secondary in event['track_in']:
+        secondary_id, rest = unpack_nfirst(raw_secondary, 1)
+        pos_x, pos_y, pos_z, rest = unpack_nfirst(rest, 3)
+        dir_x, dir_y, dir_z, rest = unpack_nfirst(rest, 3)
+        energy, time, pdg = rest
+        secondary = make_particle(pos_x, pos_y, pos_z, dir_x, dir_y, dir_z,
+                                  energy, time, pdg)
+        secondaries.append(secondary)
+    return secondaries
+
+def make_particle(pos_x, pos_y ,pos_z, dir_x, dir_y, dir_z, energy, time, pdg):
+    """Create an I3Particle with given properties"""
+    particle = dataclasses.I3Particle()
+    particle.time = time
+    particle.energy = energy
+    particle.pdg_encoding = int(pdg)
+    particle.dir = dataclasses.I3Direction(dir_x, dir_y, dir_z)
+    particle.pos = dataclasses.I3Position(pos_x, pos_y, pos_z)
+    return particle
+
 
 def unpack_nfirst(seq, nfirst):
     """Unpack the nfrist items from the list and return the rest.
     
-    a, b, c, rest = unpack_nfirst((1, 2, 3, 4, 5), 3)
-    # a = 1, b = 2, c = 3, rest = (4, 5)
+    >>> a, b, c, rest = unpack_nfirst((1, 2, 3, 4, 5), 3)
+    >>> a, b, c
+    (1, 2, 3)
+    >>> rest
+    (4, 5)
     """
     it = iter(seq)
     for x in xrange(nfirst):
@@ -81,7 +113,18 @@ with open(filename) as evt_file:
     mctree_maker(events[0])
 
 
-class TestCase(unittest.TestCase):
+class TestTools(unittest.TestCase):
+
+    def test_unpack_nfirst(self):
+        unpack_me = (1, 2, 3, 4, 5, 6)
+        a, b, c, rest = unpack_nfirst(unpack_me, 3)
+        self.assertEqual(1, a)
+        self.assertEqual(2, b)
+        self.assertEqual(3, c)
+        self.assertTupleEqual(rest, (4, 5, 6))
+
+
+class TestParser(unittest.TestCase):
 
     def setUp(self):
         self.TEST_EVT="""
@@ -101,6 +144,7 @@ class TestCase(unittest.TestCase):
         CORRUPT_HEADER="""foo"""
         with self.assertRaises(ValueError):
             extract_header(CORRUPT_HEADER.splitlines())
+
 
 if __name__ == '__main__':
     unittest.main()
