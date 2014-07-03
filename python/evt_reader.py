@@ -1,6 +1,10 @@
+import os
 import unittest
 
-filename = '/Users/tamasgal/Desktop/modk40_v4_numuNC_23.evt'
+from icecube import icetray, dataclasses
+
+
+filename = os.path.expandvars('$I3_SRC/evt_reader/resources/test/example.evt')
 
 def extract_header(evt_file):
     """Create a dictionary with the EVT header information"""
@@ -34,17 +38,47 @@ def event_generator(evt_file):
         if event:
             tag, value = line.split(':')
             if tag in ('neutrino', 'track_in', 'hit'):
-                event.setdefault(tag, []).append(value.split())
+                event.setdefault(tag, []).append([float(x) for x in value.split()])
             else:
                 event[tag] = value.split()
     return raw_events
 
-#with open(filename) as evt_file:
-#    raw_header = extract_header(evt_file)
-#    print("Parsing events...")
-#    events = event_generator(evt_file)
-#    print("Got {:d} events.".format(len(events)))
-#    print events[0]['track_in']
+def mctree_maker(event):
+    """Convert EVT-event to an I3MCTree"""
+    if len(event['neutrino']) > 1:
+        raise NotImplemented("Sorry, only one primary is support atm!")
+    raw_neutrino = event['neutrino'][0]
+    neutrino_id, rest = unpack_nfirst(raw_neutrino, 1)
+    pos_x, pos_y, pos_z, rest = unpack_nfirst(rest, 3)
+    dir_x, dir_y, dir_z, rest = unpack_nfirst(rest, 3)
+    energy, time, _, _, _, pdg, _ = rest
+    neutrino = dataclasses.I3Particle()
+    neutrino.time = time
+    neutrino.energy = energy
+    neutrino.pdg_encoding = int(pdg)
+    position = dataclasses.I3Position(pos_x, pos_y, pos_z)
+    direction = dataclasses.I3Direction(dir_x, dir_y, dir_z)
+    neutrino.dir = direction
+    neutrino.pos = position
+
+def unpack_nfirst(seq, nfirst):
+    """Unpack the nfrist items from the list and return the rest.
+    
+    a, b, c, rest = unpack_nfirst((1, 2, 3, 4, 5), 3)
+    # a = 1, b = 2, c = 3, rest = (4, 5)
+    """
+    it = iter(seq)
+    for x in xrange(nfirst):
+        yield next(it, None)
+    yield tuple(it)
+
+
+with open(filename) as evt_file:
+    raw_header = extract_header(evt_file)
+    print("Parsing events...")
+    events = event_generator(evt_file)
+    print("Got {:d} events.".format(len(events)))
+    mctree_maker(events[0])
 
 
 class TestCase(unittest.TestCase):
