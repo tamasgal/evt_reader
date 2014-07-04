@@ -4,7 +4,58 @@ import unittest
 from icecube import icetray, dataclasses
 
 
-filename = os.path.expandvars('$I3_SRC/evt_reader/resources/test/example.evt')
+
+class EventGenerator(icetray.I3Module):
+
+    def __init__(self, context): # pylint: disable=E1002
+        super(self.__class__, self).__init__(context)
+        self.AddParameter("filename", "An EVT file", None)
+        self.AddOutBox("OutBox")
+
+    def Configure(self): # pylint: disable=C0103,C0111
+        filename = self.GetParameter("filename")
+        with open(filename) as evt_file:
+            raw_header = extract_header(evt_file)
+            self.events = event_generator(evt_file)
+            #print("Got {:d} events.".format(len(events)))
+            #mctree_maker(events[0])
+
+    def Physics(self, frame): # pylint: disable=C0103,C0111
+        try:
+            event = self.events.pop()
+        except IndexError:
+            return
+
+        frame['I3MCTree'] = mctree_maker(event)
+
+        raw_hit_series = dict()
+        physics_hit_series = dict()
+        simple_hit_series = dict()
+        raw_hits = event['hit']
+        for raw_hit in raw_hits:
+            hit_id, rest = unpack_nfirst(raw_hit, 1)
+            pmt_id, rest = unpack_nfirst(rest, 1)
+            charge, time, geant_code, origin, _, _ = rest
+            pulse = dataclasses.I3RecoPulse()
+            pulse.time = time
+            pulse.charge = charge
+            pulse.width = 30
+            omkey = pmtid2omkey(pmt_id)
+            raw_hit_series.setdefault(omkey, []).append(pulse)
+            if origin > 0:
+                physics_hit_series.setdefault(omkey, []).append(pulse)
+                omkey = icetray.OMKey(omkey[0], omkey[1], 0)
+                simple_hit_series.setdefault(omkey, []).append(pulse)
+
+        raw_hit_map = dataclasses.I3RecoPulseSeriesMap(raw_hit_series)
+        physics_hit_map = dataclasses.I3RecoPulseSeriesMap(physics_hit_series)
+        simple_hit_map = dataclasses.I3RecoPulseSeriesMap(simple_hit_series)
+        frame.Put("RawHitSeries", raw_hit_map)
+        frame.Put("PhysicsHitSeries", physics_hit_map)
+        frame.Put("SimpleHitSeries", simple_hit_map)
+        self.PushFrame(frame)
+
+
 
 def extract_header(evt_file):
     """Create a dictionary with the EVT header information"""
@@ -25,9 +76,9 @@ def event_generator(evt_file):
     event = None
     for line in evt_file:
         line = line.strip()
-        #print("Checking line '{:s}'".format(line))
         if line.startswith('end_event:') and event:
             raw_events.append(event)
+            #yield event
             event = None
             continue
         if line.startswith('start_event:'):
@@ -89,6 +140,17 @@ def make_particle(pos_x, pos_y ,pos_z, dir_x, dir_y, dir_z, energy, time, pdg):
     particle.pos = dataclasses.I3Position(pos_x, pos_y, pos_z)
     return particle
 
+def pmtid2omkey(pmt_id, first_pmt_id=1, oms_per_string=18, pmts_per_om=31):
+    """Convert (consecutive) raw PMT IDs to Multi-OMKeys."""
+    pmts_per_string = oms_per_string * pmts_per_om
+    string = ((pmt_id - first_pmt_id) / pmts_per_string) + 1
+    om = oms_per_string - (pmt_id - first_pmt_id) % pmts_per_string / pmts_per_om
+    pmt = (pmt_id - first_pmt_id) % pmts_per_om
+    try:
+        from icecube import icetray
+        return icetray.OMKey(int(string), int(om), int(pmt))
+    except ImportError:
+        return (string, om, pmt)
 
 def unpack_nfirst(seq, nfirst):
     """Unpack the nfrist items from the list and return the rest.
@@ -105,13 +167,6 @@ def unpack_nfirst(seq, nfirst):
     yield tuple(it)
 
 
-with open(filename) as evt_file:
-    raw_header = extract_header(evt_file)
-    print("Parsing events...")
-    events = event_generator(evt_file)
-    print("Got {:d} events.".format(len(events)))
-    mctree_maker(events[0])
-
 
 class TestTools(unittest.TestCase):
 
@@ -122,6 +177,15 @@ class TestTools(unittest.TestCase):
         self.assertEqual(2, b)
         self.assertEqual(3, c)
         self.assertTupleEqual(rest, (4, 5, 6))
+
+    def test_pmtid2omkey(self):
+        self.assertEqual((1, 13, 12), pmtid2omkey(168))
+        self.assertEqual((1, 12, 18), pmtid2omkey(205))
+        self.assertEqual((1, 11, 22), pmtid2omkey(240))
+        self.assertEqual((4, 11, 2), pmtid2omkey(1894))
+        self.assertEqual((9, 18, 0), pmtid2omkey(4465))
+        self.assertEqual((95, 7, 16), pmtid2omkey(52810))
+        self.assertEqual((95, 4, 13), pmtid2omkey(52900))
 
 
 class TestParser(unittest.TestCase):
