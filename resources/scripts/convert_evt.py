@@ -6,6 +6,7 @@ Converts an EVT file to an I3 file, ready to use in IceTray.
 
 Usage:
     convert_evt.py -i <evt_file> -o <i3_file>
+    convert_evt.py -i <evt_file> -o <i3_file> -n <events>
     convert_evt.py (-h | --help)
     convert_evt.py --version
 
@@ -13,6 +14,7 @@ Options:
     -h --help       Show this screen.
     -i <evt_file>   Input file.
     -o <i3_file>    Output file.
+    -n <events>     Number of events to convert.
 """
 __author__ = "Tamas Gal"
 __copyright__ = ("Copyright 2014, Tamas Gal and the KM3NeT collaboration "
@@ -28,6 +30,7 @@ from docopt import docopt
 arguments = docopt(__doc__, version=__version__)
 inputfile = arguments['-i']
 outputfile = arguments['-o']
+n_events = arguments['-n']
 
 from os.path import expandvars
 
@@ -43,7 +46,7 @@ tray = I3Tray()
 #              ("GCDFileName", geometry)
 #              )
 
-tray.AddModule("I3InfiniteSource","source",Stream=icetray.I3Frame.Physics)
+tray.AddModule("I3InfiniteSource", "source", Stream=icetray.I3Frame.Physics)
 
 #filename = expandvars('$I3_SRC/evt_reader/resources/test/example.evt')
 tray.AddModule(EventGenerator, "event_generator", filename=inputfile)
@@ -55,5 +58,8 @@ tray.AddModule("Dump","dump")
 
 tray.AddModule("I3Writer","writer")(("filename", outputfile))
 tray.AddModule("TrashCan", "the can")
-tray.Execute(10)
+if n_events:
+    tray.Execute(int(n_events))
+else:
+    tray.Execute()
 tray.Finish()
