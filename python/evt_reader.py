@@ -149,7 +149,7 @@ def get_secondaries(event):
             secondary_id, rest = unpack_nfirst(raw_secondary, 1)
             pos_x, pos_y, pos_z, rest = unpack_nfirst(rest, 3)
             dir_x, dir_y, dir_z, rest = unpack_nfirst(rest, 3)
-            energy, time, pdg = rest
+            energy, time, pdg, rest = unpack_nfirst(rest, 3)
             secondary = make_particle(pos_x, pos_y, pos_z,
                                       dir_x, dir_y, dir_z,
                                       energy, time, pdg)
