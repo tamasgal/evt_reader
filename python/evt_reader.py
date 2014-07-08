@@ -157,7 +157,9 @@ def get_secondaries(event):
             secondary = make_particle(pos_x, pos_y, pos_z,
                                       dir_x, dir_y, dir_z,
                                       energy, time, pdg)
-            if length > 0:
+            if length:
+                # TODO: need proper implementation
+                length = length[0]
                 secondary.length = length
             secondaries.append(secondary)
         except ValueError:
@@ -198,13 +200,13 @@ def geant2pdg(geant_code):
         7: 111, # pi0
         8: 211, # piplus
         9: -211, # piminus
-        10, 130, # k0long
-        11, 321, # kplus
-        12, -321, # kminus
-        13, 2112,  # neutron
-        14, 2212, # proton
-        16, 310, # kaon0short
-        17, 221, # eta
+        10: 130, # k0long
+        11: 321, # kplus
+        12: -321, # kminus
+        13: 2112,  # neutron
+        14: 2212, # proton
+        16: 310, # kaon0short
+        17: 221, # eta
         }
     try:
         return conversion_table[geant_code]
