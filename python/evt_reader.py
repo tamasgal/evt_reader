@@ -149,7 +149,8 @@ def get_secondaries(event):
             secondary_id, rest = unpack_nfirst(raw_secondary, 1)
             pos_x, pos_y, pos_z, rest = unpack_nfirst(rest, 3)
             dir_x, dir_y, dir_z, rest = unpack_nfirst(rest, 3)
-            energy, time, pdg, rest = unpack_nfirst(rest, 3)
+            energy, time, geant_id, rest = unpack_nfirst(rest, 3)
+            pdg = geant2pdg(geant_id)
             secondary = make_particle(pos_x, pos_y, pos_z,
                                       dir_x, dir_y, dir_z,
                                       energy, time, pdg)
@@ -182,6 +183,18 @@ def pmtid2omkey(pmt_id, first_pmt_id=1, oms_per_string=18, pmts_per_om=31):
     except ImportError:
         return (string, om, pmt)
 
+def geant2pdg(geant_code):
+    conversion_table = {
+        1: 22,   # photon
+        2: -11, # positron
+        3: 11,   # electron
+        5: -13,    # muplus
+        6: 13,   # muminus
+        }
+    try:
+        return conversion_table[geant_code]
+    except KeyError:
+        return 0
 
 def unpack_nfirst(seq, nfirst):
     """Unpack the nfrist items from the list and return the rest.
@@ -196,6 +209,7 @@ def unpack_nfirst(seq, nfirst):
     for x in xrange(nfirst):
         yield next(it, None)
     yield tuple(it)
+
 
 
 class TestTools(unittest.TestCase):
@@ -217,6 +231,11 @@ class TestTools(unittest.TestCase):
         self.assertEqual((95, 7, 16), tuple(pmtid2omkey(52810)))
         self.assertEqual((95, 4, 13), tuple(pmtid2omkey(52900)))
 
+    def test_geant2pdg(self):
+        self.assertEqual(22, geant2pdg(1))
+
+    def test_geant2pdg_returns_zero_for_unknown_particle(self):
+        self.assertEqual(0, geant2pdg(999))
 
 class TestParser(unittest.TestCase):
 
