@@ -149,7 +149,7 @@ def get_secondaries(event):
             secondary_id, rest = unpack_nfirst(raw_secondary, 1)
             pos_x, pos_y, pos_z, rest = unpack_nfirst(rest, 3)
             dir_x, dir_y, dir_z, rest = unpack_nfirst(rest, 3)
-            energy, time, geant_id, rest = unpack_nfirst(rest, 3)
+            energy, time, geant_id, length = unpack_nfirst(rest, 3)
             # TODO: this is a temporary fix of a bug in EVT files!
             if secondary_id == 1:
                 geant_id = 6
@@ -157,6 +157,8 @@ def get_secondaries(event):
             secondary = make_particle(pos_x, pos_y, pos_z,
                                       dir_x, dir_y, dir_z,
                                       energy, time, pdg)
+            if length > 0:
+                secondary.length = length
             secondaries.append(secondary)
         except ValueError:
             print("Could not parse line:\n{:s}".format(raw_secondary))
