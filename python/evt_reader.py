@@ -159,8 +159,9 @@ def get_secondaries(event):
                                       energy, time, pdg)
             if length:
                 # TODO: need proper implementation
+                #       length is negative, is particle is leaving the can
                 length = length[0]
-                secondary.length = length
+                secondary.length = abs(length)
             secondaries.append(secondary)
         except ValueError:
             print("Could not parse line:\n{:s}".format(raw_secondary))
