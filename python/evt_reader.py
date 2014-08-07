@@ -28,20 +28,33 @@ class EventGenerator(icetray.I3Module):
     def __init__(self, context): # pylint: disable=E1002
         super(self.__class__, self).__init__(context)
         self.AddParameter("filename", "An EVT file", None)
+        self.AddParameter("event_id", "Event to be extracted", None)
         self.AddOutBox("OutBox")
 
     def Configure(self): # pylint: disable=C0103,C0111
         filename = self.GetParameter("filename")
+        self.event_id = self.GetParameter("event_id")
+        if self.event_id:
+            print("Only extracting event with ID: {0}".format(self.event_id))
+        
+        self.event_index = 0
+
         self.evt_file = open(filename)
         # TODO: header conversion
         raw_header = extract_header(self.evt_file)
         self.events = event_generator(self.evt_file)
 
     def Physics(self, frame): # pylint: disable=C0103,C0111
+        self.event_index += 1
+
         try:
             event = self.events.next()
         except StopIteration:
             return
+
+        if self.event_id and not int(self.event_id) == int(self.event_index):
+            return
+
 
         frame['I3MCTree'] = mctree_maker(event)
 
@@ -118,12 +131,18 @@ def event_generator(evt_file):
 
 def mctree_maker(event):
     """Convert EVT-event to an I3MCTree"""
-    neutrino = get_neutrino(event)
-    secondaries = get_secondaries(event)
     mctree = dataclasses.I3MCTree()
-    mctree.add_primary(neutrino)
-    for secondary in secondaries:
-        mctree.append_child(neutrino, secondary)
+    try:
+        neutrino = get_neutrino(event)
+        secondaries = get_secondaries(event)
+        mctree.add_primary(neutrino)
+        for secondary in secondaries:
+            mctree.append_child(neutrino, secondary)
+    except KeyError:
+        # No neutrino found, assuming primaries as atm muons
+        atm_muons = get_secondaries(event)
+        for atm_muon in atm_muons:
+            mctree.add_primary(atm_muon)
     return mctree
 
 

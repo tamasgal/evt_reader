@@ -7,6 +7,7 @@ Converts an EVT file to an I3 file, ready to use in IceTray.
 Usage:
     convert_evt.py -i <evt_file> -o <i3_file>
     convert_evt.py -i <evt_file> -o <i3_file> -n <events>
+    convert_evt.py -i <evt_file> -o <i3_file> -e <event_id>
     convert_evt.py (-h | --help)
     convert_evt.py --version
 
@@ -15,6 +16,7 @@ Options:
     -i <evt_file>   Input file.
     -o <i3_file>    Output file.
     -n <events>     Number of events to convert.
+    -e <event_id>      Extract only event with this event ID.
 """
 __author__ = "Tamas Gal"
 __copyright__ = ("Copyright 2014, Tamas Gal and the KM3NeT collaboration "
@@ -31,6 +33,7 @@ arguments = docopt(__doc__, version=__version__)
 inputfile = arguments['-i']
 outputfile = arguments['-o']
 n_events = arguments['-n']
+event_id = arguments['-e']
 
 from os.path import expandvars
 
@@ -49,7 +52,8 @@ tray = I3Tray()
 tray.AddModule("I3InfiniteSource", "source", Stream=icetray.I3Frame.Physics)
 
 #filename = expandvars('$I3_SRC/evt_reader/resources/test/example.evt')
-tray.AddModule(EventGenerator, "event_generator", filename=inputfile)
+tray.AddModule(EventGenerator, "event_generator",
+               filename=inputfile, event_id=event_id)
 
 
 tray.AddModule('I3MetaSynth',"muxme")
@@ -60,6 +64,8 @@ tray.AddModule("I3Writer","writer")(("filename", outputfile))
 tray.AddModule("TrashCan", "the can")
 if n_events:
     tray.Execute(int(n_events))
+elif event_id:
+    tray.Execute(int(event_id))
 else:
     tray.Execute()
 tray.Finish()
