@@ -38,6 +38,7 @@ class EventGenerator(icetray.I3Module):
             print("Only extracting event with ID: {0}".format(self.event_id))
         
         self.event_index = 0
+        self.skip_rest = False
 
         self.evt_file = open(filename)
         # TODO: header conversion
@@ -52,7 +53,9 @@ class EventGenerator(icetray.I3Module):
         except StopIteration:
             return
 
-        if self.event_id and not int(self.event_id) == int(self.event_index):
+        event_id = int(event['start_event'][0])
+        print("Event ID: {0}".format(event_id))
+        if self.event_id and not int(self.event_id) == int(event_id):
             return
 
 
